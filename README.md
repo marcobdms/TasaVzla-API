@@ -8,7 +8,7 @@ Diseñada para desarrolladores y proyectos que necesitan integrar el tipo de cam
 
 ## ⚡ ¿Por qué usar TasaVzla API?
 
-- 🚀 **Respuesta ultrarrápida (sub-miliegundo):** Las tasas se sirven directamente desde caché en base de datos.
+- 🚀 **Respuesta ultrarrápida (sub-milisegundo):** Las tasas se sirven directamente desde caché en base de datos.
 - 🛡️ **Alta disponibilidad:** Si el sitio web del BCV se cae o falla, la API sigue respondiendo con el último valor válido o activa fuentes de respaldo automáticas.
 - 🔄 **Actualización automática:** Se sincroniza varias veces al día en días hábiles dentro del horario habitual de publicación del BCV (horario Venezuela).
 - 🆓 **Fácil de consumir:** Respuestas JSON limpias, estandarizadas y sin necesidad de autenticación.
