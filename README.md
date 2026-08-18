@@ -1,28 +1,34 @@
-# TasaVzla
+# 🇻🇪 TasaVzla API
 
-> API FastAPI que expone la tasa oficial de cambio USD/VES y EUR/VES del Banco Central de Venezuela.
+> API pública, rápida y confiable para consultar la **tasa oficial de cambio del Banco Central de Venezuela (BCV)** para **USD/VES** y **EUR/VES**.
 
-## Stack
-
-- **FastAPI** + **uvicorn** (ASGI)
-- **SQLAlchemy async** + **asyncpg** + **PostgreSQL**
-- **httpx** + **BeautifulSoup4/lxml** para scraping
-- **tenacity** para reintentos con backoff
-- **APScheduler** para el job programado
-- Deploy con **Coolify** / Docker
+Diseñada para desarrolladores y proyectos que necesitan integrar el tipo de cambio oficial venezolano sin sufrir por las caídas o la lentitud de la web del BCV.
 
 ---
 
-## Endpoints
+## ⚡ ¿Por qué usar TasaVzla API?
 
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| GET | `/rate/usd` | Tasa USD/VES oficial BCV |
-| GET | `/rate/eur` | Tasa EUR/VES oficial BCV |
-| GET | `/health` | Liveness probe |
-| GET | `/docs` | Swagger UI interactivo |
+- 🚀 **Respuesta ultrarrápida (sub-miliegundo):** Las tasas se sirven directamente desde caché en base de datos.
+- 🛡️ **Alta disponibilidad:** Si el sitio web del BCV se cae o falla, la API sigue respondiendo con el último valor válido o activa fuentes de respaldo automáticas.
+- 🔄 **Actualización automática:** Se sincroniza varias veces al día en días hábiles dentro del horario habitual de publicación del BCV (horario Venezuela).
+- 🆓 **Fácil de consumir:** Respuestas JSON limpias, estandarizadas y sin necesidad de autenticación.
 
-### Ejemplo de respuesta
+---
+
+## 📡 Endpoints Disponibles
+
+| Método | Endpoint | Descripción |
+| :--- | :--- | :--- |
+| `GET` | `/rate/usd` | Obtiene la tasa oficial actual de **Dólar (USD/VES)** |
+| `GET` | `/rate/eur` | Obtiene la tasa oficial actual de **Euro (EUR/VES)** |
+| `GET` | `/health` | Estado operativo de la API |
+| `GET` | `/docs` | Documentación interactiva de Swagger UI |
+
+---
+
+## 📄 Estructura de Respuesta
+
+### `GET /rate/usd`
 
 ```json
 {
@@ -35,102 +41,65 @@
 }
 ```
 
-**Valores de `source`:**
-- `bcv_direct` — scrapeo exitoso desde bcv.org.ve
-- `dolarapi_fallback` — BCV falló; dato obtenido de ve.dolarapi.com
-- `cached_stale` — ambas fuentes fallaron; se devuelve el último valor guardado
+### 📋 Detalle de los campos
+
+| Campo | Tipo | Descripción |
+| :--- | :--- | :--- |
+| `currency` | `string` | Código de la moneda consultada (`USD` o `EUR`). |
+| `rate` | `number` | Valor de la tasa de cambio en Bolívares (VES). |
+| `source` | `string` | Origen del dato (`bcv_direct`, `dolarapi_fallback` o `cached_stale`). |
+| `rate_date` | `string (YYYY-MM-DD)` | Fecha valor oficial reportada por el BCV. |
+| `fetched_at` | `string (ISO 8601)` | Timestamp exacto en el que se sincronizó la tasa. |
+| `stale` | `boolean` | `true` solo en caso extremo de que fallen todas las fuentes y se devuelva un valor anterior. |
 
 ---
 
-## Cadena de Fallback
+## 💻 Ejemplos de Integración
 
+### JavaScript / TypeScript (Fetch)
+```javascript
+// Obtener tasa USD
+async function getTasaDolar() {
+  try {
+    const res = await fetch("https://<TU-DOMINIO>/rate/usd");
+    const data = await res.json();
+    console.log(`Tasa USD: ${data.rate} VES (Fecha: ${data.rate_date})`);
+    return data.rate;
+  } catch (error) {
+    console.error("Error al obtener la tasa:", error);
+  }
+}
 ```
-1. BCV directo (bcv.org.ve, div#dolar / div#euro, 3 reintentos + backoff)
-        ↓ falla
-2. dolarapi.com (ve.dolarapi.com/v1/dolares/oficial, /v1/euros)
-        ↓ falla también
-3. Último valor cacheado en DB con stale=true
+
+### Python (httpx / requests)
+```python
+import httpx
+
+response = httpx.get("https://<TU-DOMINIO>/rate/usd")
+data = response.json()
+
+print(f"1 USD = {data['rate']} VES (Fuente: {data['source']})")
 ```
 
----
-
-## Scheduler
-
-El job corre en horario laboral venezolano (VET = UTC−4), **días hábiles** (lun–vie):
-
-| Hora VET | Hora UTC |
-|----------|----------|
-| 15:00 | 19:00 |
-| 17:00 | 21:00 |
-| 19:00 | 23:00 |
-
-El BCV publica típicamente entre las 14h–16h VET; los tres runs cubren publicaciones tardías sin consultar cada minuto.
-
----
-
-## Setup local
-
+### cURL
 ```bash
-# 1. Clonar y entrar al directorio
-git clone <repo> && cd TasaVzla
-
-# 2. Levantar con Docker Compose
-docker compose up --build
-
-# 3. Probar
-curl http://localhost:8000/rate/usd
-curl http://localhost:8000/rate/eur
-curl http://localhost:8000/health
-```
-
-Swagger UI disponible en `http://localhost:8000/docs`.
-
----
-
-## Setup desarrollo sin Docker
-
-```bash
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-
-cp .env.example .env
-# Editar .env con tu DATABASE_URL
-
-uvicorn app.main:app --reload
+curl -X GET "https://<TU-DOMINIO>/rate/usd" -H "Accept: application/json"
 ```
 
 ---
 
-## Deploy en Coolify
+## 🕒 Horario de Actualización
 
-1. Conectar repositorio en Coolify → **Dockerfile** build
-2. Agregar variable de entorno `DATABASE_URL` con la cadena de conexión a tu PostgreSQL (el que gestiona Coolify o externo)
-3. Exponer puerto `8000`
-4. Deploy → Coolify construye la imagen y levanta el contenedor
+La API corre tareas automáticas de sincronización en días hábiles (lunes a viernes) en los horarios clave de publicación del BCV:
 
-No se necesitan migraciones manuales: SQLAlchemy crea las tablas automáticamente en el primer arranque con `create_tables()`.
+- **15:00 VET** (Hora de Venezuela)
+- **17:00 VET**
+- **19:00 VET**
 
 ---
 
-## Estructura del proyecto
+## 🛠️ Documentación Interactiva
 
-```
-TasaVzla/
-├── app/
-│   ├── __init__.py       # versión del paquete
-│   ├── main.py           # FastAPI app, lifespan, rutas
-│   ├── config.py         # settings (pydantic-settings)
-│   ├── database.py       # engine async, sesión, create_tables
-│   ├── models.py         # ORM model ExchangeRate
-│   ├── schemas.py        # Pydantic response schemas
-│   ├── crud.py           # upsert_rate, get_latest_rate
-│   ├── scraper.py        # BCV scraper (httpx + BS4 + tenacity)
-│   ├── fallback.py       # dolarapi.com fallback
-│   ├── fetcher.py        # orquestador primary → fallback
-│   └── scheduler.py      # APScheduler setup
-├── Dockerfile
-├── docker-compose.yml
-├── requirements.txt
-└── .env.example
-```
+Puedes probar todos los endpoints y ver los esquemas en tiempo real directamente desde tu navegador en:
+
+👉 `https://<TU-DOMINIO>/docs`
